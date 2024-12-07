@@ -1169,7 +1169,11 @@ class DPOTrainer(Trainer):
         labels[~loss_mask] = 0  # dummy token; we'll ignore the losses on these tokens later
         per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
         per_token_logps[~loss_mask] = 0
-        all_logps = per_token_logps.sum(-1)
+
+        if self.loss_type == "dpo_norm":
+            all_logps = (per_token_logps * loss_mask).sum(-1) / loss_mask.sum(-1)
+        else:
+            all_logps = per_token_logps.sum(-1)
 
         output = {}
 
@@ -1194,7 +1198,7 @@ class DPOTrainer(Trainer):
                 torch.flatten(chosen_logits, end_dim=1), torch.flatten(chosen_labels, end_dim=1), ignore_index=0
             )
 
-        if self.loss_type == "ipo" or self.loss_type == "dpo_norm":
+        if self.loss_type == "ipo":
             all_logps = all_logps / loss_mask.sum(-1)
 
         output["chosen_logps"] = all_logps[:num_examples]
